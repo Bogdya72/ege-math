@@ -9,10 +9,15 @@ import { Task1Page } from "./components/Task1Page";
 
 export default function App() {
   const [page, setPage] = useState('home');
-  const [progress, setProgress] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('ege26_v5')||'null') || {total:0,correct:0,streak:0,best:0}; }
-    catch { return {total:0,correct:0,streak:0,best:0}; }
-  });
+  const [progress, setProgress] = useState({total:0,correct:0,streak:0,best:0});
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ege26_v5');
+      if (saved) setProgress(JSON.parse(saved));
+    } catch {}
+  }, []);
+
   useEffect(() => {
     try { localStorage.setItem('ege26_v5', JSON.stringify(progress)); } catch {}
   }, [progress]);
