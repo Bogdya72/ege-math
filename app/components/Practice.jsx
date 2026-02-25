@@ -1,20 +1,31 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { BANK, shuffle } from '../data/bank';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { getTasks, COUNTS } from '../data/bank';
 import { SUBTOPICS } from '../data/subtopics';
 import { Confetti } from './Confetti';
 import { ScratchPad } from './ScratchPad';
 
 export const Practice = ({ subId, progress, setProgress }) => {
-  const [pool] = useState(() => {
-    if (subId === 'mixed') return shuffle(Object.values(BANK).flat()).map((p,i)=>({...p,id:i}));
-    return shuffle(BANK[subId]||[]).map((p,i)=>({...p,id:i}));
-  });
+  const [pool, setPool] = useState([]);
+  
+  // Инициализация пула задач при смене темы
+  useEffect(() => {
+    // Генерируем 50 задач для выбранной темы
+    const tasks = getTasks(subId, 50);
+    setPool(tasks);
+    setIdx(0);
+    setAns('');
+    setStatus(null);
+    setTries(0);
+  }, [subId]);
+
   const [idx,    setIdx]    = useState(0);
   const [ans,    setAns]    = useState('');
   const [status, setStatus] = useState(null); // null | 'wrong' | 'correct' | 'reveal'
   const [tries,  setTries]  = useState(0);    // ошибок на текущей задаче
   const [boom,   setBoom]   = useState(0);
   const inputRef = useRef();
+
+  if (pool.length === 0) return <div>Загрузка задач...</div>;
 
   const task = pool[idx % pool.length];
   const poolLen = pool.length;
@@ -28,7 +39,7 @@ export const Practice = ({ subId, progress, setProgress }) => {
   const check = () => {
     const val = parseFloat(ans.replace(',', '.'));
     if (isNaN(val)) return;
-    const ok = Math.abs(val - task.a) < 0.56;
+    const ok = Math.abs(val - task.a) < 0.001; // Сравнение с учетом float
     if (ok) {
       setStatus('correct'); setBoom(c => c + 1);
       // ФИНАЛИЗАЦИЯ — задача решена
@@ -49,12 +60,9 @@ export const Practice = ({ subId, progress, setProgress }) => {
   const acc = progress.total ? Math.round(progress.correct / progress.total * 100) : 0;
   const subLabel = SUBTOPICS.find(s => s.id === subId)?.label || 'Все темы';
 
-  // номер текущей задачи в пуле (0-based)
-  const taskNum = idx % poolLen;
-
   return (
     <div style={{ maxWidth:680, margin:'0 auto', padding:'0 16px' }}>
-      {boom > 0 && <Confetti key={boom}/>}
+      <Confetti t={boom}/>
 
       {/* прогресс */}
       <div className="card" style={{ padding:'13px 16px', marginBottom:13 }}>
@@ -75,17 +83,17 @@ export const Practice = ({ subId, progress, setProgress }) => {
         <div className="pt"><div className="pf" style={{ width:`${acc}%` }}/></div>
         <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
           <span style={{ color:'var(--t3)', fontSize:'.62rem', fontFamily:'JetBrains Mono,monospace' }}>
-            Задача {taskNum+1} из {poolLen}
+            Задача {idx + 1} (бесконечный режим)
           </span>
           <button onClick={() => setProgress({total:0,correct:0,streak:0,best:0})} style={{ background:'none', color:'var(--t3)', fontSize:'.62rem', textDecoration:'underline' }}>Сбросить</button>
         </div>
       </div>
 
       {/* карточка задачи */}
-      <div key={`${subId}-${idx}`} className="card pop" style={{ padding:'18px', marginBottom:12, borderColor:status==='correct'?'rgba(61,220,151,.4)':status==='reveal'?'rgba(255,181,71,.35)':'var(--b)', transition:'border-color .3s' }}>
+      <div key={task.id} className="card pop" style={{ padding:'18px', marginBottom:12, borderColor:status==='correct'?'rgba(61,220,151,.4)':status==='reveal'?'rgba(255,181,71,.35)':'var(--b)', transition:'border-color .3s' }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:11 }}>
           <span style={{ background:'rgba(91,142,255,.1)', border:'1px solid rgba(91,142,255,.2)', color:'var(--blue)', borderRadius:100, padding:'3px 10px', fontSize:'.62rem', fontFamily:'JetBrains Mono,monospace' }}>
-            #{progress.total + (status && status!=='wrong' ? 0 : 1)}
+            #{task.id.split('-')[2]}
           </span>
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>
             {tries > 0 && status !== 'correct' && status !== 'reveal' && (
@@ -93,7 +101,7 @@ export const Practice = ({ subId, progress, setProgress }) => {
                 ошибок: {tries}/3
               </span>
             )}
-            <span className="tag tag-src">СдамГИА</span>
+            <span className="tag tag-src">Генератор</span>
           </div>
         </div>
 
@@ -107,7 +115,7 @@ export const Practice = ({ subId, progress, setProgress }) => {
         {/* ввод ответа */}
         {status !== 'reveal' && status !== 'correct' && (
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <input ref={inputRef} type="number" step="0.5" value={ans}
+            <input ref={inputRef} type="number" step="0.1" value={ans}
               onChange={e => setAns(e.target.value)}
               onKeyDown={e => e.key==='Enter' && ans && check()}
               placeholder="Ответ…"
